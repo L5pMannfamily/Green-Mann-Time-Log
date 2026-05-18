@@ -62,7 +62,7 @@
   .save-btn:hover { background: var(--accent-dark); }
   .save-btn:active { transform: scale(0.98); }
   .save-btn i { font-size: 20px; }
-  .save-btn:disabled { background: #9FE1CB; cursor: not-allowed; }
+  .info-box { background: var(--accent-light); border: 0.5px solid var(--accent); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--accent-dark); line-height: 1.6; }
   .log-header { margin-bottom: 10px; }
   .log-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
   .entry { padding: 12px; border: 0.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; background: var(--bg); }
@@ -77,15 +77,9 @@
   .toast.success { background: #27500A; color: #C0DD97; }
   .toast.error { background: #791F1F; color: #F7C1C1; }
   .toast.show { opacity: 1; }
-  /* Hidden form for iOS submission */
-  #submit-frame { display: none; }
 </style>
 </head>
 <body>
-
-<!-- Hidden iframe to absorb the form response so page doesn't navigate away -->
-<iframe id="submit-frame" name="submit-frame"></iframe>
-
 <div class="app">
   <div class="header">
     <div class="logo"><i class="ti ti-clock"></i></div>
@@ -93,6 +87,10 @@
       <div class="title">Green Mann Time Log</div>
       <div class="sub" id="today-label"></div>
     </div>
+  </div>
+
+  <div class="info-box">
+    After tapping Save, a new tab opens briefly to send the data, then closes. Your entry is saved when you see "Saved ✓".
   </div>
 
   <div class="card">
@@ -321,21 +319,17 @@ function saveEntry() {
     description: desc
   };
 
-  // Build a hidden form and submit it into the hidden iframe.
-  // This is the most reliable method on iOS — iOS never blocks form submissions.
-  var params = new URLSearchParams(payload);
-  var form = document.createElement('form');
-  form.method = 'GET';
-  form.action = APPS_SCRIPT_URL + '?' + params.toString();
-  form.target = 'submit-frame';
-  document.body.appendChild(form);
-  form.submit();
-  document.body.removeChild(form);
+  // Open the Apps Script URL directly in a new tab — iOS always allows this.
+  // The tab will show the JSON response briefly then can be closed.
+  const params = new URLSearchParams(payload);
+  const url = APPS_SCRIPT_URL + '?' + params.toString();
+  window.open(url, '_blank');
 
-  // Update UI immediately — form submission into iframe is fire-and-forget
+  // Update UI straight away
+  const savedEnd = end;
   entries.unshift({ ...payload });
   renderEntries();
-  document.getElementById('f-start').value = end || '';
+  document.getElementById('f-start').value = savedEnd || '';
   document.getElementById('f-end').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('transcript').textContent = 'e.g. "9am to 2pm tree removal"';
