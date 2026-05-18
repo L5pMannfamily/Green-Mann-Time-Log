@@ -90,7 +90,7 @@
   </div>
 
   <div class="info-box">
-    After tapping Save, a new tab opens briefly to send the data, then closes. Your entry is saved when you see "Saved ✓".
+    After tapping Save, a new tab will open briefly to send the data — close it and return here.
   </div>
 
   <div class="card">
@@ -134,7 +134,7 @@
     </div>
 
     <div style="margin-top: 14px;">
-      <button class="save-btn" id="save-btn" onclick="saveEntry()">
+      <button class="save-btn" id="save-btn" onclick="saveEntry(this)">
         <i class="ti ti-device-floppy"></i> Save to sheet
       </button>
     </div>
@@ -300,7 +300,8 @@ function fmt12(timeVal) {
   return h12 + ':' + pad(m) + ' ' + ampm;
 }
 
-function saveEntry() {
+// Called directly by onclick — no async, no delay, so iOS allows window.open
+function saveEntry(btn) {
   if (!APPS_SCRIPT_URL) { showToast('Apps Script URL not configured', 'error'); return; }
   const date  = document.getElementById('f-date').value;
   const start = document.getElementById('f-start').value;
@@ -319,22 +320,11 @@ function saveEntry() {
     description: desc
   };
 
-  // Open the Apps Script URL directly in a new tab — iOS always allows this.
-  // The tab will show the JSON response briefly then can be closed.
+  // Open the URL directly — must be synchronous and the first thing that
+  // happens after the tap for iOS to allow it
   const params = new URLSearchParams(payload);
   const url = APPS_SCRIPT_URL + '?' + params.toString();
-  window.open(url, '_blank');
-
-  // Update UI straight away
-  const savedEnd = end;
-  entries.unshift({ ...payload });
-  renderEntries();
-  document.getElementById('f-start').value = savedEnd || '';
-  document.getElementById('f-end').value = '';
-  document.getElementById('f-desc').value = '';
-  document.getElementById('transcript').textContent = 'e.g. "9am to 2pm tree removal"';
-  document.getElementById('transcript').classList.remove('has-text');
-  showToast('Saved to sheet ✓', 'success');
+  window.location.href = url;
 }
 
 function renderEntries() {
