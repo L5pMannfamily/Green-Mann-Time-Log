@@ -194,36 +194,29 @@ function parseTime(text) {
 function parseTranscript(text) {
   let start = '', end = '', desc = '';
 
-  // Normalize: collapse spaces, convert a.m./p.m. to am/pm
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(/a\.m\./gi, 'am').replace(/p\.m\./gi, 'pm');
 
-  // Collect all time tokens that include am/pm
   const ampmTokens = Array.from(text.matchAll(/\d{1,2}(?::\d{2})?\s*(?:am|pm)/gi));
 
-  // Try "X to/until/till/through Y" range pattern
   const rangeMatch = text.match(/(?:from\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(?:to|until|till|through)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
   if (rangeMatch) {
     start = parseTime(rangeMatch[1]);
     end   = parseTime(rangeMatch[2]);
   }
 
-  // Try "started/began at X"
   if (!start) {
     const sm = text.match(/(?:start(?:ed|ing)?|begin|began)\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
     if (sm) start = parseTime(sm[1]);
   }
-  // Try "stopped/finished/done at Y"
   if (!end) {
     const em = text.match(/(?:stop(?:ped)?|finish(?:ed)?|end(?:ed)?|done)\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
     if (em) end = parseTime(em[1]);
   }
 
-  // Fallback: first two am/pm tokens
   if (!start && ampmTokens.length >= 1) start = parseTime(ampmTokens[0][0]);
   if (!end   && ampmTokens.length >= 2) end   = parseTime(ampmTokens[1][0]);
 
-  // Description: everything after the last am/pm token
   if (ampmTokens.length > 0) {
     const lastToken = ampmTokens[ampmTokens.length - 1];
     const afterLast = text.slice(lastToken.index + lastToken[0].length);
@@ -311,6 +304,13 @@ function fmt12(timeVal) {
   return h12 + ':' + pad(m) + ' ' + ampm;
 }
 
+function sendViaImage(url) {
+  var img = new Image();
+  img.src = url;
+  // Keep a reference so iOS doesn't garbage collect it before the request fires
+  window._pendingImg = img;
+}
+
 async function saveEntry() {
   if (!APPS_SCRIPT_URL) { showToast('Apps Script URL not configured', 'error'); return; }
   const date  = document.getElementById('f-date').value;
@@ -337,7 +337,12 @@ async function saveEntry() {
   const params = new URLSearchParams(payload);
   const url = APPS_SCRIPT_URL + '?' + params.toString();
 
-  function onSaveComplete() {
+  // Fire immediately, then again after 1s as backup for iOS
+  sendViaImage(url);
+  setTimeout(function() { sendViaImage(url); }, 1000);
+
+  // Wait 4 seconds then update the UI
+  setTimeout(function() {
     btn.disabled = false;
     document.getElementById('saving-overlay').classList.remove('show');
     entries.unshift({ ...payload });
@@ -348,19 +353,7 @@ async function saveEntry() {
     document.getElementById('transcript').textContent = 'e.g. "9am to 2pm tree removal"';
     document.getElementById('transcript').classList.remove('has-text');
     showToast('Saved to sheet ✓', 'success');
-  }
-
-  // Send request then wait 3 seconds for it to land before resetting the UI.
-  // no-cors means we can't read the response, but the request does go through.
-  // The 3s delay ensures Apps Script has time to write the row before we clear the form.
-  try {
-    fetch(url, { mode: 'no-cors' });
-  } catch(e) {
-    // fetch unavailable — fall back to Image()
-    const img = new Image();
-    img.src = url;
-  }
-  setTimeout(onSaveComplete, 3000);
+  }, 4000);
 }
 
 function renderEntries() {
